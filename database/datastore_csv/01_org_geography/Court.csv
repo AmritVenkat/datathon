@@ -1,0 +1,63 @@
+CourtID,CourtName,DistrictID,StateID,Active
+1,"District & Sessions Court, Bagalkot",1,1,1
+2,"Civil Judge Court, Bagalkot",1,1,1
+3,"District & Sessions Court, Ballari",2,1,1
+4,"Civil Judge Court, Ballari",2,1,1
+5,"District & Sessions Court, Belagavi",3,1,1
+6,"Civil Judge Court, Belagavi",3,1,1
+7,"District & Sessions Court, Bengaluru Rural",4,1,1
+8,"Civil Judge Court, Bengaluru Rural",4,1,1
+9,"District & Sessions Court, Bengaluru Urban",5,1,1
+10,"Civil Judge Court, Bengaluru Urban",5,1,1
+11,"District & Sessions Court, Bidar",6,1,1
+12,"Civil Judge Court, Bidar",6,1,1
+13,"District & Sessions Court, Chamarajanagar",7,1,1
+14,"Civil Judge Court, Chamarajanagar",7,1,1
+15,"District & Sessions Court, Chikballapur",8,1,1
+16,"Civil Judge Court, Chikballapur",8,1,1
+17,"District & Sessions Court, Chikkamagaluru",9,1,1
+18,"Civil Judge Court, Chikkamagaluru",9,1,1
+19,"District & Sessions Court, Chitradurga",10,1,1
+20,"Civil Judge Court, Chitradurga",10,1,1
+21,"District & Sessions Court, Dakshina Kannada",11,1,1
+22,"Civil Judge Court, Dakshina Kannada",11,1,1
+23,"District & Sessions Court, Davanagere",12,1,1
+24,"Civil Judge Court, Davanagere",12,1,1
+25,"District & Sessions Court, Dharwad",13,1,1
+26,"Civil Judge Court, Dharwad",13,1,1
+27,"District & Sessions Court, Gadag",14,1,1
+28,"Civil Judge Court, Gadag",14,1,1
+29,"District & Sessions Court, Hassan",15,1,1
+30,"Civil Judge Court, Hassan",15,1,1
+31,"District & Sessions Court, Haveri",16,1,1
+32,"Civil Judge Court, Haveri",16,1,1
+33,"District & Sessions Court, Kalaburagi",17,1,1
+34,"Civil Judge Court, Kalaburagi",17,1,1
+35,"District & Sessions Court, Kodagu",18,1,1
+36,"Civil Judge Court, Kodagu",18,1,1
+37,"District & Sessions Court, Kolar",19,1,1
+38,"Civil Judge Court, Kolar",19,1,1
+39,"District & Sessions Court, Koppal",20,1,1
+40,"Civil Judge Court, Koppal",20,1,1
+41,"District & Sessions Court, Mandya",21,1,1
+42,"Civil Judge Court, Mandya",21,1,1
+43,"District & Sessions Court, Mysuru",22,1,1
+44,"Civil Judge Court, Mysuru",22,1,1
+45,"District & Sessions Court, Raichur",23,1,1
+46,"Civil Judge Court, Raichur",23,1,1
+47,"District & Sessions Court, Ramanagara",24,1,1
+48,"Civil Judge Court, Ramanagara",24,1,1
+49,"District & Sessions Court, Shivamogga",25,1,1
+50,"Civil Judge Court, Shivamogga",25,1,1
+51,"District & Sessions Court, Tumakuru",26,1,1
+52,"Civil Judge Court, Tumakuru",26,1,1
+53,"District & Sessions Court, Udupi",27,1,1
+54,"Civil Judge Court, Udupi",27,1,1
+55,"District & Sessions Court, Uttara Kannada",28,1,1
+56,"Civil Judge Court, Uttara Kannada",28,1,1
+57,"District & Sessions Court, Vijayapura",29,1,1
+58,"Civil Judge Court, Vijayapura",29,1,1
+59,"District & Sessions Court, Yadgir",30,1,1
+60,"Civil Judge Court, Yadgir",30,1,1
+61,"District & Sessions Court, Chikkaballapur",31,1,1
+62,"Civil Judge Court, Chikkaballapur",31,1,1

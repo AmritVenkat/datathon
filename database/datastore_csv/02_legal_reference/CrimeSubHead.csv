@@ -1,0 +1,44 @@
+CrimeSubHeadID,CrimeHeadID,CrimeHeadName,SeqID
+1,1,Murder,1
+2,1,Attempt to Murder,2
+3,1,Culpable Homicide,3
+4,1,Grievous Hurt,4
+5,1,Simple Hurt,5
+6,2,Theft,1
+7,2,Burglary,2
+8,2,Robbery,3
+9,2,Dacoity,4
+10,2,Criminal Breach of Trust,5
+11,2,Cheating,6
+12,3,Rape,1
+13,3,Outraging Modesty,2
+14,3,Dowry Harassment,3
+15,3,Domestic Violence,4
+16,3,Kidnapping of Woman,5
+17,4,POCSO Penetrative Assault,1
+18,4,POCSO Sexual Assault,2
+19,4,Child Kidnapping,3
+20,4,Child Labour,4
+21,5,Bank Fraud,1
+22,5,Cheating - Property,2
+23,5,Forgery,3
+24,5,Counterfeiting,4
+25,6,Cannabis Possession,1
+26,6,Drug Trafficking,2
+27,6,Illicit Liquor,3
+28,6,Psychotropic Substance Sale,4
+29,7,Identity Theft,1
+30,7,Online Fraud,2
+31,7,Obscene Content,3
+32,7,Hacking,4
+33,8,Drunken Driving,1
+34,8,Hit and Run,2
+35,8,Driving Without License,3
+36,8,Rash Driving,4
+37,9,Rioting,1
+38,9,Unlawful Assembly,2
+39,9,Gambling,3
+40,9,Public Nuisance,4
+41,10,Bribery,1
+42,10,Criminal Misconduct,2
+43,10,Abuse of Official Position,3
