@@ -1,0 +1,6 @@
+{
+  "name": "ksp-crime-intel-client",
+  "homepage": "index.html",
+  "login_redirect": "index.html",
+  "404": "404.html"
+}
