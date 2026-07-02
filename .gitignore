@@ -1,0 +1,93 @@
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.cache/
+
+# ==========================
+# Node.js
+# ==========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================
+# Environment Variables
+# ==========================
+.env
+.env.*
+!.env.example
+
+# ==========================
+# IDE
+# ==========================
+.vscode/
+.idea/
+*.swp
+
+# ==========================
+# Operating System
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# Build Output
+# ==========================
+.build/
+dist/
+build/
+
+# ==========================
+# Logs
+# ==========================
+logs/
+*.log
+
+# ==========================
+# Catalyst
+# ==========================
+.agents/
+client/.cache/
+functions/**/__pycache__/
+
+# Ignore Python bytecode inside all functions
+functions/**/*.pyc
+
+# Ignore Node modules anywhere in project
+**/node_modules/
+
+# Ignore compiled Python files
+functions/**/*.pyo
+functions/**/*.pyd
+
+# ==========================
+# Database (only if generated)
+# ==========================
+*.sqlite3
+*.db
+
+# ==========================
+# Misc
+# ==========================
+*.tmp
+*.bak
+*.orig
