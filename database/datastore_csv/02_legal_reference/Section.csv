@@ -1,48 +1,48 @@
 ActCode,SectionCode,SectionDescription,Active
-IPC,302,Punishment for murder,1
-IPC,304,Punishment for culpable homicide not amounting to murder,1
-IPC,307,Attempt to murder,1
-IPC,324,Voluntarily causing hurt by dangerous weapons or means,1
-IPC,325,Punishment for voluntarily causing grievous hurt,1
-IPC,354,Assault or criminal force to woman with intent to outrage her modesty,1
-IPC,363,Punishment for kidnapping,1
-IPC,376,Punishment for rape,1
-IPC,379,Punishment for theft,1
-IPC,380,Theft in dwelling house,1
-IPC,392,Punishment for robbery,1
-IPC,395,Punishment for dacoity,1
-IPC,406,Punishment for criminal breach of trust,1
-IPC,420,Cheating and dishonestly inducing delivery of property,1
-IPC,498A,Husband or relative of husband subjecting woman to cruelty,1
-IPC,506,Punishment for criminal intimidation,1
-BNS,103,Punishment for murder,1
-BNS,109,Attempt to murder,1
-BNS,115,Voluntarily causing hurt,1
-BNS,303,Theft,1
-BNS,309,Robbery,1
-BNS,318,Cheating,1
-BNS,351,Criminal intimidation,1
-NDPS,8,Prohibition of certain operations,1
-NDPS,20,Punishment for contravention in relation to cannabis,1
-NDPS,21,Punishment for contravention in relation to manufactured drugs,1
-NDPS,22,Punishment for contravention in relation to psychotropic substances,1
-NDPS,27A,Punishment for financing illicit traffic,1
-MV,177,General provision for punishment of offences,1
-MV,184,Driving dangerously,1
-MV,185,Driving by drunken person,1
-MV,196,Driving without insurance,1
-POCSO,4,Punishment for penetrative sexual assault,1
-POCSO,6,Punishment for aggravated penetrative sexual assault,1
-POCSO,8,Punishment for sexual assault,1
-POCSO,12,Punishment for sexual harassment,1
-ARMS,25,Punishment for certain offences relating to arms,1
-ARMS,27,Punishment for using arms,1
-SC_ST,3,Punishments for offences of atrocities,1
-EXCISE,32,"Illegal import, export, transport, manufacture, possession or sale",1
-GAMBLING,4,Punishment for keeping a common gaming house,1
-IT_ACT,66,Computer related offences,1
-IT_ACT,66C,Identity theft,1
-IT_ACT,67,Publishing obscene material in electronic form,1
-PREVENTION_CORRUPTION,7,Offence relating to public servant being bribed,1
-PREVENTION_CORRUPTION,13,Criminal misconduct by a public servant,1
-DV,12,Application to Magistrate,1
+IPC,302,Punishment for murder,true
+IPC,304,Punishment for culpable homicide not amounting to murder,true
+IPC,307,Attempt to murder,true
+IPC,324,Voluntarily causing hurt by dangerous weapons or means,true
+IPC,325,Punishment for voluntarily causing grievous hurt,true
+IPC,354,Assault or criminal force to woman with intent to outrage her modesty,true
+IPC,363,Punishment for kidnapping,true
+IPC,376,Punishment for rape,true
+IPC,379,Punishment for theft,true
+IPC,380,Theft in dwelling house,true
+IPC,392,Punishment for robbery,true
+IPC,395,Punishment for dacoity,true
+IPC,406,Punishment for criminal breach of trust,true
+IPC,420,Cheating and dishonestly inducing delivery of property,true
+IPC,498A,Husband or relative of husband subjecting woman to cruelty,true
+IPC,506,Punishment for criminal intimidation,true
+BNS,103,Punishment for murder,true
+BNS,109,Attempt to murder,true
+BNS,115,Voluntarily causing hurt,true
+BNS,303,Theft,true
+BNS,309,Robbery,true
+BNS,318,Cheating,true
+BNS,351,Criminal intimidation,true
+NDPS,8,Prohibition of certain operations,true
+NDPS,20,Punishment for contravention in relation to cannabis,true
+NDPS,21,Punishment for contravention in relation to manufactured drugs,true
+NDPS,22,Punishment for contravention in relation to psychotropic substances,true
+NDPS,27A,Punishment for financing illicit traffic,true
+MV,177,General provision for punishment of offences,true
+MV,184,Driving dangerously,true
+MV,185,Driving by drunken person,true
+MV,196,Driving without insurance,true
+POCSO,4,Punishment for penetrative sexual assault,true
+POCSO,6,Punishment for aggravated penetrative sexual assault,true
+POCSO,8,Punishment for sexual assault,true
+POCSO,12,Punishment for sexual harassment,true
+ARMS,25,Punishment for certain offences relating to arms,true
+ARMS,27,Punishment for using arms,true
+SC_ST,3,Punishments for offences of atrocities,true
+EXCISE,32,"Illegal import, export, transport, manufacture, possession or sale",true
+GAMBLING,4,Punishment for keeping a common gaming house,true
+IT_ACT,66,Computer related offences,true
+IT_ACT,66C,Identity theft,true
+IT_ACT,67,Publishing obscene material in electronic form,true
+PREVENTION_CORRUPTION,7,Offence relating to public servant being bribed,true
+PREVENTION_CORRUPTION,13,Criminal misconduct by a public servant,true
+DV,12,Application to Magistrate,true

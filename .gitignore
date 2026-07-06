@@ -91,3 +91,17 @@ functions/**/*.pyd
 *.tmp
 *.bak
 *.orig
+
+
+# Catalyst import reports
+*-ERRORS.csv
+*-WARNINGS.csv
+
+# Catalyst local config
+.catalystrc
+
+
+# Generated reports
+generated_reports/
+exports/
+downloads/
