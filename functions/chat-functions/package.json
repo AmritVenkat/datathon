@@ -1,0 +1,10 @@
+{
+  "name": "kavach-api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "engines": { "node": "18" },
+  "dependencies": {
+    "express": "^4.22.1",
+    "zcatalyst-sdk-node": "^3.4.0"
+  }
+}
