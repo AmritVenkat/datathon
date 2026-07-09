@@ -268,7 +268,7 @@ Junction table: one arrest event ↔ multiple accused.
 | JunctionID | Int | Unique |
 | ArrestSurrenderID | Int | FK → ArrestSurrender.ArrestSurrenderID |
 | AccusedMasterID | Int | FK → Accused.AccusedMasterID |
-
+    
 ### ChargesheetDetails
 | Column | Type | Notes |
 |---|---|---|

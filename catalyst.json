@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "targets": ["chat-functions"],
+    "source": "functions"
+  },
+  "client": {
+    "source": "frontend",
+    "plugin": "react"
+  }
+}
