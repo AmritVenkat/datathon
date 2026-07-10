@@ -46,7 +46,7 @@ if you later add app-level validation). Folder numbers (`01_`, `02_`, ...) refle
 ### Unit
 | Column | Type | Notes |
 |---|---|---|
-| UnitID | Int | Unique |
+| UnitID | Int | Unique |cd
 | UnitName | String | |
 | TypeID | Int | FK → UnitType.UnitTypeID |
 | ParentUnit | Int | self-ref → Unit.UnitID (blank for root) |
