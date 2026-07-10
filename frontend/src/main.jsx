@@ -411,18 +411,49 @@ function Cases({ selectedCase, setSelectedCaseId }) {
 }
 
 function CrimeMap({ setSelectedCaseId, setPage }) {
+    const [mapCenter, setMapCenter] = useState({ lat: 12.9716, lng: 77.5946, zoom: 11, label: "Bengaluru Urban" });
+    const [hotspots, setHotspots] = useState([]);
+
+    useEffect(() => {
+        apiFetch("/analytics/hotspots?days=365")
+            .then((response) => response.json())
+            .then((payload) => setHotspots(payload.hotspots || []))
+            .catch(() => setHotspots([]));
+    }, []);
+
+    const visiblePins = hotspots.length
+        ? hotspots.map((item) => ({
+            id: `H-${item.rank}`,
+            label: `Hotspot ${item.rank}`,
+            district: item.rank === 1 ? "Scoped hotspot" : "Hotspot",
+            category: `${item.cases} cases`,
+            station: `${item.latitude}, ${item.longitude}`,
+            risk: item.cases,
+            lat: item.latitude,
+            lng: item.longitude,
+        }))
+        : cases;
+
     return (
         <div className="page">
             <Panel title="Crime Map" subtitle="Operational hotspot view with station and category overlays">
                 <div className="map-layout">
-                    <div className="map-canvas">
-                        <div className="map-label north">KARNATAKA</div>
-                        {cases.map((item, index) => (
+                    <div className="map-canvas real-map">
+                        <TileLayer center={mapCenter} />
+                        <div className="map-label north">{mapCenter.label}</div>
+                        {visiblePins.map((item) => (
                             <button
                                 key={item.id}
-                                className={`map-pin pin-${index + 1}`}
-                                onClick={() => { setSelectedCaseId(item.id); setPage("cases"); }}
-                                title={item.crimeNo}
+                                className="map-pin"
+                                style={pinStyle(item, mapCenter)}
+                                onClick={() => {
+                                    if (Number.isFinite(Number(item.id))) {
+                                        setSelectedCaseId(item.id);
+                                        setPage("cases");
+                                    }
+                                    setMapCenter({ lat: item.lat, lng: item.lng, zoom: 12, label: item.district });
+                                }}
+                                title={item.crimeNo || item.label}
                             >
                                 {item.risk}
                             </button>
@@ -433,8 +464,11 @@ function CrimeMap({ setSelectedCaseId, setPage }) {
                     </div>
                     <div className="map-panel">
                         <h3>Hotspot ranking</h3>
-                        {cases.map((item) => (
-                            <button className="hotspot-row" key={item.id} onClick={() => { setSelectedCaseId(item.id); setPage("cases"); }}>
+                        {visiblePins.map((item) => (
+                            <button className="hotspot-row" key={item.id} onClick={() => {
+                                if (Number.isFinite(Number(item.id))) setSelectedCaseId(item.id);
+                                setMapCenter({ lat: item.lat, lng: item.lng, zoom: 12, label: item.district });
+                            }}>
                                 <strong>{item.district}</strong>
                                 <span>{item.category} - {item.station}</span>
                                 <RiskBadge score={item.risk} small />
@@ -447,9 +481,50 @@ function CrimeMap({ setSelectedCaseId, setPage }) {
     );
 }
 
+function TileLayer({ center }) {
+    const tileSize = 256;
+    const centerTile = latLngToTile(center.lat, center.lng, center.zoom);
+    const offsets = [-1, 0, 1];
+    const centerPixel = latLngToWorldPixel(center.lat, center.lng, center.zoom);
+    return (
+        <div className="tile-layer">
+            {offsets.flatMap((dx) => offsets.map((dy) => {
+                const x = centerTile.x + dx;
+                const y = centerTile.y + dy;
+                const left = 50 + ((x * tileSize - centerPixel.x) / tileSize) * 33.333;
+                const top = 50 + ((y * tileSize - centerPixel.y) / tileSize) * 33.333;
+                return <img key={`${x}-${y}`} src={`https://tile.openstreetmap.org/${center.zoom}/${x}/${y}.png`} style={{ left: `${left}%`, top: `${top}%` }} alt="" />;
+            }))}
+        </div>
+    );
+}
+
+function pinStyle(item, center) {
+    const centerPixel = latLngToWorldPixel(center.lat, center.lng, center.zoom);
+    const itemPixel = latLngToWorldPixel(item.lat, item.lng, center.zoom);
+    const left = 50 + ((itemPixel.x - centerPixel.x) / 256) * 33.333;
+    const top = 50 + ((itemPixel.y - centerPixel.y) / 256) * 33.333;
+    return { left: `${left}%`, top: `${top}%` };
+}
+
+function latLngToTile(lat, lng, zoom) {
+    const pixel = latLngToWorldPixel(lat, lng, zoom);
+    return { x: Math.floor(pixel.x / 256), y: Math.floor(pixel.y / 256) };
+}
+
+function latLngToWorldPixel(lat, lng, zoom) {
+    const sin = Math.sin((lat * Math.PI) / 180);
+    const scale = 256 * 2 ** zoom;
+    return {
+        x: ((lng + 180) / 360) * scale,
+        y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale,
+    };
+}
+
 function Network({ selectedCase }) {
     const [remoteGraph, setRemoteGraph] = useState(null);
     const [graphStatus, setGraphStatus] = useState("Loading scoped DataStore graph");
+    const [graphQuery, setGraphQuery] = useState(selectedCase.crimeNo);
     const fallbackNodes = [
         { id: "case", label: selectedCase.crimeNo.slice(-5), x: 50, y: 50, size: 32, type: "case" },
         { id: "a1", label: selectedCase.accused[0] || "Accused", x: 25, y: 25, size: 22, type: "accused" },
@@ -461,7 +536,12 @@ function Network({ selectedCase }) {
     const fallbackEdges = [["case", "a1"], ["case", "a2"], ["case", "station"], ["case", "court"], ["case", "section"], ["a1", "section"]];
 
     useEffect(() => {
-        apiFetch("/analytics/network?limit=200")
+        const timeout = setTimeout(() => {
+            const term = graphQuery.trim();
+            const params = new URLSearchParams({ limit: "300" });
+            if (/^\d{18}$/.test(term)) params.set("crimeNo", term);
+            else if (term) params.set("person", term);
+            apiFetch(`/analytics/network?${params.toString()}`)
             .then((response) => response.json())
             .then((payload) => {
                 setRemoteGraph(layoutGraph(payload.nodes || [], payload.edges || []));
@@ -471,7 +551,9 @@ function Network({ selectedCase }) {
                 setRemoteGraph(null);
                 setGraphStatus("Offline preview graph");
             });
-    }, []);
+        }, 350);
+        return () => clearTimeout(timeout);
+    }, [graphQuery]);
 
     const nodes = remoteGraph?.nodes?.length ? remoteGraph.nodes : fallbackNodes;
     const edges = remoteGraph?.edges?.length ? remoteGraph.edges.map((edge) => [edge.source, edge.target]) : fallbackEdges;
@@ -479,6 +561,15 @@ function Network({ selectedCase }) {
     return (
         <div className="page">
             <Panel title="Network Graph" subtitle="Case, person, station, court, and legal-section relationships">
+                <div className="graph-toolbar">
+                    <input
+                        value={graphQuery}
+                        onChange={(event) => setGraphQuery(event.target.value)}
+                        placeholder="Type FIR number or accused/person name"
+                    />
+                    <button onClick={() => setGraphQuery(selectedCase.crimeNo)}>Selected case</button>
+                    <button onClick={() => setGraphQuery(selectedCase.accused[0] || "")}>Selected person</button>
+                </div>
                 <div className="graph-wrap">
                     <svg viewBox="0 0 100 100" className="graph">
                         {edges.map(([source, target]) => {

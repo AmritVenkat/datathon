@@ -156,18 +156,34 @@ api.get("/analytics/network", asyncRoute(async (req, res) => {
   const context = await requirePoliceOfficer(req.catalystApp, req);
   const max = Math.min(Math.max(Number(req.query.limit) || 200, 25), 500);
   const scope = await scopedCaseWhere(req.catalystApp, context);
-  const scopedCases = scope ? await query(req.catalystApp, `SELECT CaseMasterID, CrimeNo FROM CaseMaster WHERE ${scope} LIMIT ${max}`) : [];
+  const caseWhere = [];
+  if (scope) caseWhere.push(scope);
+  if (req.query.caseId && Number.isFinite(Number(req.query.caseId))) caseWhere.push(`CaseMasterID = ${Number(req.query.caseId)}`);
+  if (req.query.crimeNo) caseWhere.push(`CrimeNo = '${escapeZcql(req.query.crimeNo)}'`);
+  let scopedCases = await query(req.catalystApp, `SELECT CaseMasterID, CrimeNo, PoliceStationID, CrimeRegisteredDate FROM CaseMaster${caseWhere.length ? ` WHERE ${caseWhere.join(" AND ")}` : ""} LIMIT ${max}`);
+  if (req.query.person) {
+    const name = escapeZcql(req.query.person);
+    const matchingAccused = await query(req.catalystApp, `SELECT CaseMasterID FROM Accused WHERE AccusedName LIKE '%${name}%' LIMIT ${max}`);
+    const personCaseIds = matchingAccused.map(x => Number(x.CaseMasterID)).filter(Number.isFinite);
+    scopedCases = personCaseIds.length
+      ? await query(req.catalystApp, `SELECT CaseMasterID, CrimeNo, PoliceStationID, CrimeRegisteredDate FROM CaseMaster WHERE CaseMasterID IN (${personCaseIds.join(",")})${scope ? ` AND ${scope}` : ""} LIMIT ${max}`)
+      : [];
+  }
   const caseIds = scopedCases.map(c => Number(c.CaseMasterID)).filter(Number.isFinite);
-  const caseFilter = scope ? ` WHERE CaseMasterID IN (${caseIds.length ? caseIds.join(",") : "0"})` : "";
+  const caseFilter = ` WHERE CaseMasterID IN (${caseIds.length ? caseIds.join(",") : "0"})`;
   const accused = await query(req.catalystApp, `SELECT AccusedMasterID, CaseMasterID, AccusedName, PersonID FROM Accused${caseFilter} LIMIT ${max}`);
   const byCase = accused.reduce((m, x) => ((m[x.CaseMasterID] ||= []).push(x), m), {});
-  const nodes = accused.map(x => ({ id: `A${x.AccusedMasterID}`, label: x.AccusedName, type: "accused", caseId: x.CaseMasterID }));
+  const nodes = [
+    ...scopedCases.map(x => ({ id: `C${x.CaseMasterID}`, label: x.CrimeNo, type: "case", caseId: x.CaseMasterID })),
+    ...accused.map(x => ({ id: `A${x.AccusedMasterID}`, label: x.AccusedName, type: "accused", caseId: x.CaseMasterID }))
+  ];
   const edges = [];
-  Object.values(byCase).forEach(group => {
+  Object.entries(byCase).forEach(([caseId, group]) => {
+    group.forEach(person => edges.push({ source: `A${person.AccusedMasterID}`, target: `C${caseId}`, relation: "named-in-case", caseId: Number(caseId) }));
     for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++)
       edges.push({ source: `A${group[i].AccusedMasterID}`, target: `A${group[j].AccusedMasterID}`, relation: "co-accused", caseId: group[i].CaseMasterID });
   });
-  res.json({ nodes, edges, disclaimer: "Links indicate shared records, not proven criminal association." });
+  res.json({ nodes, edges, cases: scopedCases, disclaimer: "Links indicate shared records, not proven criminal association." });
 }));
 
 api.post("/chat/query", asyncRoute(async (req, res) => {
