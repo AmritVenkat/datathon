@@ -1,4 +1,4 @@
-git import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
     Area,
@@ -17,6 +17,22 @@ import {
 import "./styles.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/server/chat-functions";
+
+async function apiFetch(path, options = {}) {
+    const response = await fetch(`${API_BASE}${path}`, {
+        credentials: "include",
+        ...options,
+        headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {}),
+        },
+    });
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `Request failed with ${response.status}`);
+    }
+    return response;
+}
 
 const cases = [
     {
@@ -154,6 +170,10 @@ function App() {
     const [page, setPage] = useState("dashboard");
     const [selectedCaseId, setSelectedCaseId] = useState(1001);
     const [query, setQuery] = useState("");
+    const [language, setLanguage] = useState("en");
+    const [officer, setOfficer] = useState(null);
+    const [authError, setAuthError] = useState("");
+    const [conversationId, setConversationId] = useState("");
     const [messages, setMessages] = useState([
         {
             role: "assistant",
@@ -163,6 +183,13 @@ function App() {
     ]);
     const selectedCase = cases.find((item) => item.id === selectedCaseId) || cases[0];
     const activePage = nav.find((item) => item.id === page);
+
+    useEffect(() => {
+        apiFetch("/auth/me")
+            .then((response) => response.json())
+            .then(setOfficer)
+            .catch((error) => setAuthError(error.message));
+    }, []);
 
     const metrics = useMemo(
         () => [
@@ -181,25 +208,24 @@ function App() {
         setQuery("");
 
         try {
-            const response = await fetch(`${API_BASE}/chat/query`, {
+            const response = await apiFetch("/chat/query", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question, language: "en" }),
+                body: JSON.stringify({ question, language, conversationId }),
             });
-            if (response.ok) {
-                const payload = await response.json();
-                setMessages((items) => [
-                    ...items,
-                    {
-                        role: "assistant",
-                        text: payload.answer,
-                        citations: (payload.citations || []).map((item) => `${item.table}: ${item.label}`),
-                    },
-                ]);
-                return;
-            }
-        } catch {
+            const payload = await response.json();
+            setConversationId(payload.conversationId || conversationId);
+            setMessages((items) => [
+                ...items,
+                {
+                    role: "assistant",
+                    text: payload.answer,
+                    citations: (payload.citations || []).map((item) => `${item.table}: ${item.label}`),
+                },
+            ]);
+            return;
+        } catch (error) {
             // Local Vite preview still works without Catalyst serve.
+            setAuthError(error.message);
         }
 
         const answer = localAnswer(question);
@@ -210,20 +236,20 @@ function App() {
         <div className="shell">
             <Sidebar page={page} setPage={setPage} />
             <main className="workspace">
-                <Topbar title={activePage?.label || "Dashboard"} />
+                <Topbar title={activePage?.label || "Dashboard"} officer={officer} authError={authError} />
                 {page === "dashboard" && <Dashboard metrics={metrics} setPage={setPage} setSelectedCaseId={setSelectedCaseId} />}
                 {page === "cases" && <Cases selectedCase={selectedCase} setSelectedCaseId={setSelectedCaseId} />}
                 {page === "map" && <CrimeMap setSelectedCaseId={setSelectedCaseId} setPage={setPage} />}
                 {page === "network" && <Network selectedCase={selectedCase} />}
                 {page === "analytics" && <Analytics />}
-                {page === "chat" && <Chat messages={messages} query={query} setQuery={setQuery} sendMessage={sendMessage} />}
+                {page === "chat" && <Chat messages={messages} query={query} setQuery={setQuery} sendMessage={sendMessage} language={language} setLanguage={setLanguage} conversationId={conversationId} />}
                 {page === "documents" && <Documents />}
                 {page === "court" && <Court />}
                 {page === "bond" && <Bond />}
                 {page === "admin" && <Admin />}
                 {page === "settings" && <Settings />}
             </main>
-            <Inspector selectedCase={selectedCase} setPage={setPage} sendMessage={sendMessage} />
+            <Inspector selectedCase={selectedCase} setPage={setPage} sendMessage={sendMessage} officer={officer} />
         </div>
     );
 }
@@ -257,7 +283,7 @@ function Sidebar({ page, setPage }) {
     );
 }
 
-function Topbar({ title }) {
+function Topbar({ title, officer, authError }) {
     return (
         <header className="topbar">
             <div>
@@ -265,6 +291,9 @@ function Topbar({ title }) {
                 <h1>{title}</h1>
             </div>
             <div className="top-actions">
+                <span className={authError ? "session warning" : "session"}>
+                    {authError ? authError : officer ? `${officer.role} - ${officer.employee?.FirstName || officer.user?.kgid}` : "Checking session"}
+                </span>
                 <button title="Search">SRCH</button>
                 <button title="Notifications">BELL</button>
                 <button className="primary">Export briefing</button>
@@ -419,7 +448,9 @@ function CrimeMap({ setSelectedCaseId, setPage }) {
 }
 
 function Network({ selectedCase }) {
-    const nodes = [
+    const [remoteGraph, setRemoteGraph] = useState(null);
+    const [graphStatus, setGraphStatus] = useState("Loading scoped DataStore graph");
+    const fallbackNodes = [
         { id: "case", label: selectedCase.crimeNo.slice(-5), x: 50, y: 50, size: 32, type: "case" },
         { id: "a1", label: selectedCase.accused[0] || "Accused", x: 25, y: 25, size: 22, type: "accused" },
         { id: "a2", label: selectedCase.accused[1] || "Associate", x: 72, y: 26, size: 20, type: "accused" },
@@ -427,7 +458,24 @@ function Network({ selectedCase }) {
         { id: "court", label: selectedCase.court, x: 79, y: 75, size: 18, type: "court" },
         { id: "section", label: selectedCase.category, x: 51, y: 86, size: 16, type: "legal" },
     ];
-    const edges = [["case", "a1"], ["case", "a2"], ["case", "station"], ["case", "court"], ["case", "section"], ["a1", "section"]];
+    const fallbackEdges = [["case", "a1"], ["case", "a2"], ["case", "station"], ["case", "court"], ["case", "section"], ["a1", "section"]];
+
+    useEffect(() => {
+        apiFetch("/analytics/network?limit=200")
+            .then((response) => response.json())
+            .then((payload) => {
+                setRemoteGraph(layoutGraph(payload.nodes || [], payload.edges || []));
+                setGraphStatus(payload.disclaimer || "Scoped network loaded from DataStore");
+            })
+            .catch(() => {
+                setRemoteGraph(null);
+                setGraphStatus("Offline preview graph");
+            });
+    }, []);
+
+    const nodes = remoteGraph?.nodes?.length ? remoteGraph.nodes : fallbackNodes;
+    const edges = remoteGraph?.edges?.length ? remoteGraph.edges.map((edge) => [edge.source, edge.target]) : fallbackEdges;
+
     return (
         <div className="page">
             <Panel title="Network Graph" subtitle="Case, person, station, court, and legal-section relationships">
@@ -436,7 +484,7 @@ function Network({ selectedCase }) {
                         {edges.map(([source, target]) => {
                             const s = nodes.find((node) => node.id === source);
                             const t = nodes.find((node) => node.id === target);
-                            return <line key={`${source}-${target}`} x1={s.x} y1={s.y} x2={t.x} y2={t.y} />;
+                            return s && t ? <line key={`${source}-${target}`} x1={s.x} y1={s.y} x2={t.x} y2={t.y} /> : null;
                         })}
                         {nodes.map((node) => (
                             <g key={node.id}>
@@ -447,10 +495,11 @@ function Network({ selectedCase }) {
                     </svg>
                     <div className="graph-side">
                         <h3>Explainable link analysis</h3>
-                        <p>Links indicate shared records in DataStore and documents, not proof of association. Every edge is traceable to a case, accused, station, court, or legal section record.</p>
+                        <p>{graphStatus}</p>
                         <div className="detail-grid one">
                             <Info label="Central case" value={selectedCase.crimeNo} />
-                            <Info label="Connected accused" value={String(selectedCase.accused.length)} />
+                            <Info label="Visible nodes" value={String(nodes.length)} />
+                            <Info label="Visible links" value={String(edges.length)} />
                             <Info label="Risk score" value={String(selectedCase.risk)} />
                         </div>
                     </div>
@@ -458,6 +507,24 @@ function Network({ selectedCase }) {
             </Panel>
         </div>
     );
+}
+
+function layoutGraph(nodes, edges) {
+    const radius = 37;
+    const laidOut = nodes.slice(0, 80).map((node, index, list) => {
+        const angle = (index / Math.max(list.length, 1)) * Math.PI * 2;
+        return {
+            ...node,
+            x: 50 + Math.cos(angle) * radius,
+            y: 50 + Math.sin(angle) * radius,
+            size: node.type === "case" ? 24 : 18,
+        };
+    });
+    const visibleIds = new Set(laidOut.map((node) => node.id));
+    return {
+        nodes: laidOut,
+        edges: edges.filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target)).slice(0, 160),
+    };
 }
 
 function Analytics() {
@@ -499,16 +566,35 @@ function Analytics() {
     );
 }
 
-function Chat({ messages, query, setQuery, sendMessage }) {
+function Chat({ messages, query, setQuery, sendMessage, language, setLanguage, conversationId }) {
     const suggestions = [
         "Summarize FIR 400170118202400001",
         "Show repeat offenders in Bengaluru Urban",
         "Which bonds expire in the next 30 days?",
     ];
+
+    async function exportPdf() {
+        if (!conversationId) return;
+        const response = await apiFetch("/chat/export-pdf", {
+            method: "POST",
+            body: JSON.stringify({ conversationId }),
+        });
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener,noreferrer");
+    }
+
     return (
         <div className="page chat-page">
             <Panel title="Kavach AI Assistant" subtitle="Evidence-grounded SQL, RAG, analytics, and alert reasoning">
                 <div className="chat-box">
+                    <div className="chat-controls">
+                        <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+                            <option value="en">English</option>
+                            <option value="kn">Kannada</option>
+                        </select>
+                        <button onClick={exportPdf} disabled={!conversationId}>Export PDF</button>
+                    </div>
                     <div className="messages">
                         {messages.map((message, index) => (
                             <div key={index} className={`message ${message.role}`}>

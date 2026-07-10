@@ -189,9 +189,30 @@ td span,
 
 .top-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.session {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  max-width: 240px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.session.warning {
+  border-color: #f0b8b8;
+  background: var(--red-2);
+  color: var(--red);
 }
 
 .top-actions button,
@@ -765,6 +786,29 @@ td span {
   padding: 12px 16px;
   border-top: 1px solid var(--line);
   flex-wrap: wrap;
+}
+
+.chat-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chat-controls select,
+.chat-controls button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 7px 10px;
+}
+
+.chat-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .composer {

@@ -4,7 +4,6 @@
     "source": "functions"
   },
   "client": {
-    "source": "frontend",
-    "plugin": "react"
+    "source": "frontend/dist"
   }
 }

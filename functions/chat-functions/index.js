@@ -3,14 +3,15 @@
 const express = require("express");
 const catalyst = require("zcatalyst-sdk-node");
 const {
-  id, escapeZcql, query, safeInsert, userContext, requireRole, audit, citation
+  id, escapeZcql, query, safeInsert, userContext, requireAuthenticated, requireRole,
+  requirePoliceOfficer, hasPermission, audit, citation
 } = require("./lib");
 
 const api = express();
 api.use(express.json({ limit: "1mb" }));
 api.use((req, res, next) => {
   res.set("Access-Control-Allow-Origin", req.get("origin") || "*");
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-kavach-role");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-kavach-role, x-kavach-kgid");
   res.set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   req.catalystApp = catalyst.initialize(req);
@@ -21,12 +22,29 @@ api.get("/health", (_req, res) => res.json({
   ok: true, service: "kavach-api", version: "1.0.0", time: new Date().toISOString()
 }));
 
+api.use(requireAuthenticated);
+
+api.get("/auth/me", asyncRoute(async (req, res) => {
+  const context = await requirePoliceOfficer(req.catalystApp, req);
+  await audit(req.catalystApp, req, "AUTH_ME", `Employee:${context.employee?.EmployeeID || "unmapped"}`);
+  res.json({
+    user: { id: context.user.id, email: context.user.email, kgid: context.user.kgid },
+    employee: context.employee,
+    role: context.role,
+    scope: { districtId: context.districtId, unitId: context.unitId },
+    permissions: context.permissions
+  });
+}));
+
 api.get("/dashboard", asyncRoute(async (req, res) => {
   const app = req.catalystApp;
+  const context = await requirePoliceOfficer(app, req);
+  const scope = await scopedCaseWhere(app, context);
+  const where = scope ? ` WHERE ${scope}` : "";
   const [totals, statuses, trends, alerts] = await Promise.all([
-    query(app, "SELECT COUNT(ROWID) AS TotalCases FROM CaseMaster"),
-    query(app, "SELECT CaseStatusID, COUNT(ROWID) AS Count FROM CaseMaster GROUP BY CaseStatusID"),
-    query(app, "SELECT CrimeRegisteredDate, CaseStatusID FROM CaseMaster ORDER BY CrimeRegisteredDate DESC LIMIT 500"),
+    query(app, `SELECT COUNT(ROWID) AS TotalCases FROM CaseMaster${where}`),
+    query(app, `SELECT CaseStatusID, COUNT(ROWID) AS Count FROM CaseMaster${where} GROUP BY CaseStatusID`),
+    query(app, `SELECT CrimeRegisteredDate, CaseStatusID FROM CaseMaster${where} ORDER BY CrimeRegisteredDate DESC LIMIT 500`),
     query(app, "SELECT BondRecordID, AccusedMasterID, expiryDate, status FROM BondRecord WHERE status = 'Active' ORDER BY expiryDate ASC LIMIT 10").catch(() => [])
   ]);
   const active = statuses.filter(s => ["1", "6"].includes(String(s.CaseStatusID))).reduce((n, s) => n + Number(s.Count), 0);
@@ -35,7 +53,10 @@ api.get("/dashboard", asyncRoute(async (req, res) => {
 
 api.get("/cases", asyncRoute(async (req, res) => {
   const { crimeNo, statusId, stationId, limit = "50" } = req.query;
+  const context = await requirePoliceOfficer(req.catalystApp, req);
   const where = [];
+  const scope = await scopedCaseWhere(req.catalystApp, context);
+  if (scope) where.push(scope);
   if (crimeNo) where.push(`CrimeNo = '${escapeZcql(crimeNo)}'`);
   if (statusId) where.push(`CaseStatusID = ${Number(statusId)}`);
   if (stationId) where.push(`PoliceStationID = ${Number(stationId)}`);
@@ -50,8 +71,12 @@ api.get("/cases/:id", asyncRoute(async (req, res) => {
   const caseId = Number(req.params.id);
   if (!Number.isInteger(caseId)) return res.status(400).json({ error: "Invalid case id" });
   const app = req.catalystApp;
+  const context = await requirePoliceOfficer(app, req);
+  const scope = await scopedCaseWhere(app, context);
+  const caseWhere = [`CaseMasterID = ${caseId}`];
+  if (scope) caseWhere.push(scope);
   const [cases, accused, victims, sections, arrests, chargesheets] = await Promise.all([
-    query(app, `SELECT * FROM CaseMaster WHERE CaseMasterID = ${caseId}`),
+    query(app, `SELECT * FROM CaseMaster WHERE ${caseWhere.join(" AND ")}`),
     query(app, `SELECT * FROM Accused WHERE CaseMasterID = ${caseId}`),
     query(app, `SELECT * FROM Victim WHERE CaseMasterID = ${caseId}`),
     query(app, `SELECT * FROM ActSectionAssociation WHERE CaseMasterID = ${caseId}`),
@@ -73,7 +98,11 @@ api.patch("/cases/:id/status", requireRole("investigator", "supervisor"), asyncR
   const caseId = Number(req.params.id);
   const status = Number(req.body.caseStatusId);
   if (!Number.isInteger(caseId) || !Number.isInteger(status)) return res.status(400).json({ error: "Invalid status update" });
-  const existing = await query(req.catalystApp, `SELECT ROWID, CaseStatusID FROM CaseMaster WHERE CaseMasterID = ${caseId}`);
+  const context = await requirePoliceOfficer(req.catalystApp, req);
+  const scope = await scopedCaseWhere(req.catalystApp, context);
+  const where = [`CaseMasterID = ${caseId}`];
+  if (scope) where.push(scope);
+  const existing = await query(req.catalystApp, `SELECT ROWID, CaseStatusID FROM CaseMaster WHERE ${where.join(" AND ")}`);
   if (!existing[0]) return res.status(404).json({ error: "Case not found" });
   const result = await req.catalystApp.datastore().table("CaseMaster").updateRow({ ROWID: existing[0].ROWID, CaseStatusID: status });
   await audit(req.catalystApp, req, "CASE_STATUS_UPDATE", `CaseMaster:${caseId}`, { from: existing[0].CaseStatusID, to: status });
@@ -83,10 +112,19 @@ api.patch("/cases/:id/status", requireRole("investigator", "supervisor"), asyncR
 api.get("/accused/:id/profile", asyncRoute(async (req, res) => {
   const accusedId = Number(req.params.id);
   const app = req.catalystApp;
+  const context = await requirePoliceOfficer(app, req);
   const persons = await query(app, `SELECT * FROM Accused WHERE AccusedMasterID = ${accusedId}`);
   if (!persons[0]) return res.status(404).json({ error: "Accused not found" });
   const person = persons[0];
-  const history = await query(app, `SELECT AccusedMasterID, CaseMasterID, AccusedName, PersonID FROM Accused WHERE AccusedName = '${escapeZcql(person.AccusedName)}'`);
+  const scope = await scopedCaseWhere(app, context);
+  if (scope) {
+    const allowed = await query(app, `SELECT CaseMasterID FROM CaseMaster WHERE CaseMasterID = ${Number(person.CaseMasterID)} AND ${scope}`);
+    if (!allowed[0]) return res.status(404).json({ error: "Accused not found" });
+  }
+  const scopedCases = scope ? await query(app, `SELECT CaseMasterID FROM CaseMaster WHERE ${scope} LIMIT 1000`) : [];
+  const caseIds = scopedCases.map(c => Number(c.CaseMasterID)).filter(Number.isFinite);
+  const caseFilter = scope ? ` AND CaseMasterID IN (${caseIds.length ? caseIds.join(",") : "0"})` : "";
+  const history = await query(app, `SELECT AccusedMasterID, CaseMasterID, AccusedName, PersonID FROM Accused WHERE AccusedName = '${escapeZcql(person.AccusedName)}'${caseFilter}`);
   const arrests = await query(app, `SELECT * FROM ArrestSurrender WHERE AccusedMasterID = ${accusedId}`);
   const risk = riskScore(history.length, arrests.length);
   await audit(app, req, "PERSON_PROFILE_VIEW", `Accused:${accusedId}`);
@@ -94,9 +132,13 @@ api.get("/accused/:id/profile", asyncRoute(async (req, res) => {
 }));
 
 api.get("/analytics/hotspots", asyncRoute(async (req, res) => {
+  const context = await requirePoliceOfficer(req.catalystApp, req);
   const days = Math.min(Math.max(Number(req.query.days) || 90, 7), 730);
   const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-  const points = await query(req.catalystApp, `SELECT CaseMasterID, CrimeRegisteredDate, CrimeMajorHeadID, latitude, longitude FROM CaseMaster WHERE CrimeRegisteredDate >= '${cutoff}' LIMIT 2000`);
+  const where = [`CrimeRegisteredDate >= '${cutoff}'`];
+  const scope = await scopedCaseWhere(req.catalystApp, context);
+  if (scope) where.push(scope);
+  const points = await query(req.catalystApp, `SELECT CaseMasterID, CrimeRegisteredDate, CrimeMajorHeadID, latitude, longitude FROM CaseMaster WHERE ${where.join(" AND ")} LIMIT 2000`);
   const cells = new Map();
   for (const p of points) {
     const lat = Number(p.latitude), lng = Number(p.longitude);
@@ -111,8 +153,13 @@ api.get("/analytics/hotspots", asyncRoute(async (req, res) => {
 }));
 
 api.get("/analytics/network", asyncRoute(async (req, res) => {
+  const context = await requirePoliceOfficer(req.catalystApp, req);
   const max = Math.min(Math.max(Number(req.query.limit) || 200, 25), 500);
-  const accused = await query(req.catalystApp, `SELECT AccusedMasterID, CaseMasterID, AccusedName, PersonID FROM Accused LIMIT ${max}`);
+  const scope = await scopedCaseWhere(req.catalystApp, context);
+  const scopedCases = scope ? await query(req.catalystApp, `SELECT CaseMasterID, CrimeNo FROM CaseMaster WHERE ${scope} LIMIT ${max}`) : [];
+  const caseIds = scopedCases.map(c => Number(c.CaseMasterID)).filter(Number.isFinite);
+  const caseFilter = scope ? ` WHERE CaseMasterID IN (${caseIds.length ? caseIds.join(",") : "0"})` : "";
+  const accused = await query(req.catalystApp, `SELECT AccusedMasterID, CaseMasterID, AccusedName, PersonID FROM Accused${caseFilter} LIMIT ${max}`);
   const byCase = accused.reduce((m, x) => ((m[x.CaseMasterID] ||= []).push(x), m), {});
   const nodes = accused.map(x => ({ id: `A${x.AccusedMasterID}`, label: x.AccusedName, type: "accused", caseId: x.CaseMasterID }));
   const edges = [];
@@ -125,13 +172,15 @@ api.get("/analytics/network", asyncRoute(async (req, res) => {
 
 api.post("/chat/query", asyncRoute(async (req, res) => {
   const app = req.catalystApp;
+  const context = await requirePoliceOfficer(app, req);
   const question = String(req.body.question || "").trim();
   const language = req.body.language === "kn" ? "kn" : "en";
   const conversationId = String(req.body.conversationId || id("CONV-"));
   if (!question || question.length > 1000) return res.status(400).json({ error: "Question must be 1–1000 characters" });
+  if (!hasPermission(context, "chat:use")) return res.status(403).json({ error: "Chat access denied" });
   await ensureConversation(app, req, conversationId, language);
   await saveMessage(app, conversationId, "user", question, []);
-  const grounded = await answerQuestion(app, question, language);
+  const grounded = await answerQuestion(app, question, language, context);
   const enhanced = await enhanceWithQuickML(app, question, grounded, language);
   const messageId = await saveMessage(app, conversationId, "assistant", enhanced.answer, enhanced.citations);
   await audit(app, req, "CHAT_QUERY", `Conversation:${conversationId}`, { intent: grounded.intent, citationCount: enhanced.citations.length });
@@ -145,6 +194,8 @@ api.get("/chat/:conversationId", asyncRoute(async (req, res) => {
 }));
 
 api.post("/chat/export-pdf", asyncRoute(async (req, res) => {
+  const context = await requirePoliceOfficer(req.catalystApp, req);
+  if (!hasPermission(context, "export:pdf")) return res.status(403).json({ error: "PDF export denied" });
   const conv = escapeZcql(req.body.conversationId);
   const messages = await query(req.catalystApp, `SELECT Role, Content, Citations, CreatedAt FROM ConversationMessage WHERE ConversationID = '${conv}' ORDER BY CreatedAt ASC`);
   if (!messages.length) return res.status(404).json({ error: "Conversation not found" });
@@ -161,11 +212,14 @@ api.use((error, req, res, _next) => {
   res.status(error.status || 500).json({ error: error.status ? error.message : "Backend operation failed", requestId: id("REQ-") });
 });
 
-async function answerQuestion(app, question, language) {
+async function answerQuestion(app, question, language, context) {
   const q = question.toLowerCase();
   const crimeNo = q.match(/\b\d{18}\b/)?.[0];
   if (crimeNo) {
-    const cases = await query(app, `SELECT * FROM CaseMaster WHERE CrimeNo = '${crimeNo}'`);
+    const where = [`CrimeNo = '${crimeNo}'`];
+    const scope = await scopedCaseWhere(app, context);
+    if (scope) where.push(scope);
+    const cases = await query(app, `SELECT * FROM CaseMaster WHERE ${where.join(" AND ")}`);
     if (!cases[0]) return plain(language, "fir_not_found", [], "fir");
     const c = cases[0];
     const [accused, victims, status] = await Promise.all([
@@ -183,7 +237,11 @@ async function answerQuestion(app, question, language) {
     ] };
   }
   if (/repeat|habitual|ಪುನರಾವರ್ತಿತ|ಮರು/.test(q)) {
-    const data = await query(app, "SELECT AccusedName, COUNT(ROWID) AS CaseCount FROM Accused GROUP BY AccusedName ORDER BY CaseCount DESC LIMIT 20");
+    const scope = await scopedCaseWhere(app, context);
+    const scopedCases = scope ? await query(app, `SELECT CaseMasterID FROM CaseMaster WHERE ${scope} LIMIT 1000`) : [];
+    const caseIds = scopedCases.map(c => Number(c.CaseMasterID)).filter(Number.isFinite);
+    const caseFilter = scope ? ` WHERE CaseMasterID IN (${caseIds.length ? caseIds.join(",") : "0"})` : "";
+    const data = await query(app, `SELECT AccusedName, COUNT(ROWID) AS CaseCount FROM Accused${caseFilter} GROUP BY AccusedName ORDER BY CaseCount DESC LIMIT 20`);
     const repeats = data.filter(x => Number(x.CaseCount) > 1);
     const names = repeats.slice(0, 5).map(x => `${x.AccusedName} (${x.CaseCount})`).join(", ");
     return {
@@ -193,7 +251,9 @@ async function answerQuestion(app, question, language) {
       citations: repeats.slice(0, 10).map(x => citation("Accused", x, ["AccusedName", "CaseCount"], x.AccusedName))
     };
   }
-  const recent = await query(app, "SELECT CaseMasterID, CrimeNo, CrimeRegisteredDate, BriefFacts FROM CaseMaster ORDER BY CrimeRegisteredDate DESC LIMIT 5");
+  const scope = await scopedCaseWhere(app, context);
+  const recentWhere = scope ? ` WHERE ${scope}` : "";
+  const recent = await query(app, `SELECT CaseMasterID, CrimeNo, CrimeRegisteredDate, BriefFacts FROM CaseMaster${recentWhere} ORDER BY CrimeRegisteredDate DESC LIMIT 5`);
   return {
     intent: "recent_cases",
     answer: language === "kn" ? `ನಿಮ್ಮ ಪ್ರಶ್ನೆಗೆ ಸಂಬಂಧಿಸಿದಂತೆ ${recent.length} ಇತ್ತೀಚಿನ ಪ್ರಕರಣಗಳನ್ನು ಕಂಡುಹಿಡಿದಿದ್ದೇನೆ. ಹೆಚ್ಚಿನ ನಿಖರತೆಗೆ ಎಫ್‌ಐಆರ್ ಸಂಖ್ಯೆ, ಜಿಲ್ಲೆ ಅಥವಾ ಅವಧಿಯನ್ನು ಸೂಚಿಸಿ.` : `I found ${recent.length} recent cases relevant to a general record search. Specify an FIR number, district, offence, or date range for a more precise evidence-grounded answer.`,
@@ -232,6 +292,17 @@ async function saveMessage(app, conversationId, role, content, citations) {
     Content: content, Citations: JSON.stringify(citations), CreatedAt: now()
   });
   return messageId;
+}
+
+async function scopedCaseWhere(app, context) {
+  if (!context || context.role === "admin") return "";
+  if (["supervisor", "analyst"].includes(context.role) && context.districtId) {
+    const units = await query(app, `SELECT UnitID FROM Unit WHERE DistrictID = ${context.districtId} LIMIT 500`).catch(() => []);
+    const unitIds = units.map(unit => Number(unit.UnitID)).filter(Number.isFinite);
+    return `PoliceStationID IN (${unitIds.length ? unitIds.join(",") : "0"})`;
+  }
+  if (context.unitId) return `PoliceStationID = ${context.unitId}`;
+  return process.env.NODE_ENV === "production" ? "1 = 0" : "";
 }
 
 function riskScore(caseCount, arrestCount) {

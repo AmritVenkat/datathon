@@ -1,0 +1,7 @@
+{
+  "name": "kavach-crime-intelligence",
+  "version": "1.0.0",
+  "description": "Karnataka police crime intelligence dashboard",
+  "homepage": "index.html",
+  "login_redirect": "index.html"
+}
